@@ -1,23 +1,23 @@
-import { Check, Copy, Files, Upload } from "lucide-react";
+import { Check, Copy, Files, Upload } from "lucide-react"
 
-import { formatBytes } from "@/app/api";
-import { buildCodeMessage } from "@/app/sharing";
-import type { UploadResult } from "@/app/public-transfer/types";
-import { Button } from "@/components/ui/button";
+import { formatBytes } from "@/app/api"
+import { buildCodeMessage } from "@/app/sharing"
+import type { UploadResult } from "@/app/public-transfer/types"
+import { Button } from "@/components/ui/button"
 import {
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@/components/ui/input-otp";
-import { Progress } from "@/components/ui/progress";
-import { Spinner } from "@/components/ui/spinner";
+} from "@/components/ui/input-otp"
+import { Progress } from "@/components/ui/progress"
+import { Spinner } from "@/components/ui/spinner"
 
 export function UploadStep({
   files,
@@ -29,14 +29,14 @@ export function UploadStep({
   onFilesChange,
   onUpload,
 }: {
-  files: File[];
-  totalSize: number;
-  pending: boolean;
-  progress: number;
-  status: string;
-  error: string;
-  onFilesChange: (files: File[]) => void;
-  onUpload: () => void;
+  files: File[]
+  totalSize: number
+  pending: boolean
+  progress: number
+  status: string
+  error: string
+  onFilesChange: (files: File[]) => void
+  onUpload: () => void
 }) {
   return (
     <div className="flex flex-col gap-8">
@@ -83,19 +83,21 @@ export function UploadStep({
         </Button>
       </FieldGroup>
     </div>
-  );
+  )
 }
 
 export function UploadResultStep({
+  appTitle,
   result,
   copied,
   onCopy,
   onDone,
 }: {
-  result: UploadResult;
-  copied: "code" | "share" | null;
-  onCopy: (value: string, kind: "code" | "share") => void;
-  onDone: () => void;
+  appTitle: string
+  result: UploadResult
+  copied: "code" | "share" | null
+  onCopy: (value: string, kind: "code" | "share") => void
+  onDone: () => void
 }) {
   return (
     <div className="flex flex-col gap-8">
@@ -129,7 +131,12 @@ export function UploadResultStep({
             variant="outline"
             onClick={() =>
               onCopy(
-                buildCodeMessage(location.origin, "download", result.pickupPin),
+                buildCodeMessage(
+                  location.origin,
+                  "download",
+                  result.pickupPin,
+                  appTitle,
+                ),
                 "code",
               )
             }
@@ -143,5 +150,5 @@ export function UploadResultStep({
         </Button>
       </FieldGroup>
     </div>
-  );
+  )
 }

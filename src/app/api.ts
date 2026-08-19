@@ -1,6 +1,11 @@
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { ...init, headers: { "content-type": "application/json", ...init?.headers } })
-  const data = (await response.json().catch(() => ({}))) as T & { error?: string }
+  const response = await fetch(path, {
+    ...init,
+    headers: { "content-type": "application/json", ...init?.headers },
+  })
+  const data = (await response.json().catch(() => ({}))) as T & {
+    error?: string
+  }
   if (!response.ok) throw new Error(data.error || "请求失败")
   return data
 }
@@ -40,7 +45,14 @@ export interface ManagedFile {
 export interface TransferManifest {
   id: string
   expiresAt: number
-  files: Array<{ id: string; name: string; type: string; size: number; url: string; previewUrl: string }>
+  files: Array<{
+    id: string
+    name: string
+    type: string
+    size: number
+    url: string
+    previewUrl: string
+  }>
 }
 
 export interface PageInfo {
@@ -53,7 +65,10 @@ export interface PageInfo {
 export function formatBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes < 1) return "0 B"
   const units = ["B", "KB", "MB", "GB", "TB"]
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const index = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  )
   const value = bytes / 1024 ** index
   return `${value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`
 }

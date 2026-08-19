@@ -1,20 +1,20 @@
-import { useState } from "react";
-import { motion } from "motion/react";
-import { Download, Eye, File, Files } from "lucide-react";
+import { useState } from "react"
+import { motion } from "motion/react"
+import { Download, Eye, File, Files } from "lucide-react"
 
-import { formatBytes, type TransferManifest } from "@/app/api";
-import { FilePreview, previewKind } from "@/app/public-transfer/file-preview";
-import type { PreviewFile } from "@/app/public-transfer/types";
-import { Button } from "@/components/ui/button";
+import { formatBytes, type TransferManifest } from "@/app/api"
+import { FilePreview, previewKind } from "@/app/public-transfer/file-preview"
+import type { PreviewFile } from "@/app/public-transfer/types"
+import { Button } from "@/components/ui/button"
 
 export function DownloadFilesStep({
   manifest,
   onDownloadAll,
 }: {
-  manifest: TransferManifest;
-  onDownloadAll: () => void;
+  manifest: TransferManifest
+  onDownloadAll: () => void
 }) {
-  const [preview, setPreview] = useState<PreviewFile | null>(null);
+  const [preview, setPreview] = useState<PreviewFile | null>(null)
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
@@ -33,7 +33,7 @@ export function DownloadFilesStep({
       </div>
       <div className="flex flex-col divide-y border-y">
         {manifest.files.map((file, index) => {
-          const canPreview = Boolean(previewKind(file));
+          const canPreview = Boolean(previewKind(file))
           return (
             <motion.div
               key={file.id}
@@ -74,7 +74,7 @@ export function DownloadFilesStep({
                 </Button>
               </div>
             </motion.div>
-          );
+          )
         })}
       </div>
       <p className="text-xs text-muted-foreground">
@@ -82,5 +82,5 @@ export function DownloadFilesStep({
       </p>
       <FilePreview file={preview} onClose={() => setPreview(null)} />
     </div>
-  );
+  )
 }

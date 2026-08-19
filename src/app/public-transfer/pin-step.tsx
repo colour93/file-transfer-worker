@@ -1,14 +1,15 @@
-import { ArrowRight, Download, Upload } from "lucide-react";
+import { ArrowRight, Download, Upload } from "lucide-react"
 
-import type { TransferMode } from "@/app/public-transfer/types";
-import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { extractBracketedPin } from "@/app/sharing"
+import type { TransferMode } from "@/app/public-transfer/types"
+import { Button } from "@/components/ui/button"
+import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@/components/ui/input-otp";
-import { Spinner } from "@/components/ui/spinner";
+} from "@/components/ui/input-otp"
+import { Spinner } from "@/components/ui/spinner"
 
 export function PinStep({
   mode,
@@ -18,14 +19,14 @@ export function PinStep({
   onPinChange,
   onNext,
 }: {
-  mode: TransferMode;
-  pin: string;
-  error: string;
-  pending: boolean;
-  onPinChange: (pin: string) => void;
-  onNext: () => void;
+  mode: TransferMode
+  pin: string
+  error: string
+  pending: boolean
+  onPinChange: (pin: string) => void
+  onNext: () => void
 }) {
-  const isUpload = mode === "upload";
+  const isUpload = mode === "upload"
   return (
     <div className="flex w-full flex-col gap-8">
       <Field data-invalid={Boolean(error)}>
@@ -39,6 +40,14 @@ export function PinStep({
           onChange={(value) =>
             onPinChange(value.replace(/\D/g, "").slice(0, 6))
           }
+          onPaste={(event) => {
+            const pastedPin = extractBracketedPin(
+              event.clipboardData.getData("text"),
+            )
+            if (!pastedPin) return
+            event.preventDefault()
+            onPinChange(pastedPin)
+          }}
           inputMode="numeric"
           autoComplete="one-time-code"
           pattern="[0-9]*"
@@ -67,5 +76,5 @@ export function PinStep({
         {pending ? <Spinner /> : <ArrowRight />}
       </Button>
     </div>
-  );
+  )
 }

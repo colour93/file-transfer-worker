@@ -1,17 +1,17 @@
-import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, FolderOpen } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react"
+import { ArrowLeft, FolderOpen } from "lucide-react"
 
-import { ColorSchemeButton } from "@/app/color-scheme";
-import { Button } from "@/components/ui/button";
+import { ColorSchemeButton } from "@/app/color-scheme"
+import { Button } from "@/components/ui/button"
 
 export function TransferHeader({
   title,
   canGoBack,
   onBack,
 }: {
-  title: string;
-  canGoBack: boolean;
-  onBack: () => void;
+  title: string
+  canGoBack: boolean
+  onBack: () => void
 }) {
   return (
     <header className="fixed inset-x-0 top-0 z-20 flex h-16 items-center justify-between bg-background/90 px-3 backdrop-blur-sm sm:px-5">
@@ -54,5 +54,5 @@ export function TransferHeader({
         </Button>
       </div>
     </header>
-  );
+  )
 }

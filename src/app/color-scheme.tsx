@@ -32,7 +32,9 @@ export function initializeColorScheme() {
 
 export function ColorSchemeButton() {
   const [preference, setPreference] = useState<Preference>(storedPreference)
-  const [scheme, setScheme] = useState<ResolvedScheme>(() => resolve(preference))
+  const [scheme, setScheme] = useState<ResolvedScheme>(() =>
+    resolve(preference),
+  )
 
   useEffect(() => {
     setScheme(apply(preference))
@@ -46,12 +48,36 @@ export function ColorSchemeButton() {
     return () => media.removeEventListener("change", update)
   }, [preference])
 
-  const label = preference === "system" ? "配色：跟随系统" : preference === "light" ? "配色：浅色" : "配色：深色"
-  const Icon = preference === "system" ? Monitor : scheme === "dark" ? Moon : Sun
+  const label =
+    preference === "system"
+      ? "配色：跟随系统"
+      : preference === "light"
+        ? "配色：浅色"
+        : "配色：深色"
+  const Icon =
+    preference === "system" ? Monitor : scheme === "dark" ? Moon : Sun
 
   function cycle() {
-    setPreference((current) => current === "system" ? (scheme === "dark" ? "light" : "dark") : current === "light" ? "dark" : "system")
+    setPreference((current) =>
+      current === "system"
+        ? scheme === "dark"
+          ? "light"
+          : "dark"
+        : current === "light"
+          ? "dark"
+          : "system",
+    )
   }
 
-  return <Button variant="ghost" size="icon-sm" aria-label={label} title={label} onClick={cycle}><Icon /></Button>
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={label}
+      title={label}
+      onClick={cycle}
+    >
+      <Icon />
+    </Button>
+  )
 }

@@ -1,25 +1,22 @@
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react"
 
-import { DownloadFilesStep } from "@/app/public-transfer/download-files-step";
-import { ModeSelector } from "@/app/public-transfer/mode-selector";
-import { PinStep } from "@/app/public-transfer/pin-step";
-import { TransferHeader } from "@/app/public-transfer/transfer-header";
-import {
-  UploadResultStep,
-  UploadStep,
-} from "@/app/public-transfer/upload-step";
-import { useTransferFlow } from "@/app/public-transfer/use-transfer-flow";
-import { useAppTitle } from "@/app/use-app-title";
+import { DownloadFilesStep } from "@/app/public-transfer/download-files-step"
+import { ModeSelector } from "@/app/public-transfer/mode-selector"
+import { PinStep } from "@/app/public-transfer/pin-step"
+import { TransferHeader } from "@/app/public-transfer/transfer-header"
+import { UploadResultStep, UploadStep } from "@/app/public-transfer/upload-step"
+import { useTransferFlow } from "@/app/public-transfer/use-transfer-flow"
+import { useAppTitle } from "@/app/use-app-title"
 
 const pageMotion = {
   enter: (direction: number) => ({ opacity: 0, x: direction * 28 }),
   center: { opacity: 1, x: 0 },
   exit: (direction: number) => ({ opacity: 0, x: direction * -28 }),
-};
+}
 
 export function PublicPage() {
-  const title = useAppTitle();
-  const flow = useTransferFlow();
+  const title = useAppTitle()
+  const flow = useTransferFlow()
 
   return (
     <main className="min-h-svh overflow-hidden px-5 sm:px-7">
@@ -62,6 +59,7 @@ export function PublicPage() {
               <UploadStep {...flow.uploadStepProps} />
             ) : flow.step === "upload-result" && flow.result ? (
               <UploadResultStep
+                appTitle={title}
                 result={flow.result}
                 copied={flow.copied}
                 onCopy={flow.copy}
@@ -77,5 +75,5 @@ export function PublicPage() {
         </AnimatePresence>
       </section>
     </main>
-  );
+  )
 }
