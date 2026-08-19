@@ -2,7 +2,7 @@ const enc = new TextEncoder()
 const dec = new TextDecoder()
 export const bytes = (n: number) => crypto.getRandomValues(new Uint8Array(n))
 export const token = (n = 32) => b64(bytes(n))
-export const pin = () => Array.from(bytes(10), (v) => String(v % 10)).join('')
+export const pin = () => Array.from(bytes(6), (v) => String(v % 10)).join('')
 export const b64 = (input: Uint8Array) => btoa(String.fromCharCode(...input)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 function fromB64(value: string) {
   const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4)

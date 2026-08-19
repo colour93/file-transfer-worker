@@ -2,6 +2,7 @@ name = "file-transfer-worker"
 main = "src/worker/index.ts"
 compatibility_date = "2025-01-01"
 assets = { directory = "./dist", binding = "ASSETS", not_found_handling = "single-page-application", run_worker_first = ["/api/*", "/auth/*", "/s/*"] }
+routes = [{ pattern = "file.9993.fun", custom_domain = true }]
 
 [triggers]
 crons = ["0 3 * * *"]
@@ -9,14 +10,11 @@ crons = ["0 3 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "file-transfer"
-database_id = "replace-me"
+database_id = "8bd04086-b5d5-4514-9a96-f9a04d44ee06"
 
 [vars]
-S3_REGION = "auto"
-S3_FORCE_PATH_STYLE = "false"
 MAX_FILE_BYTES = "5368709120"
 UPLOAD_URL_TTL = "900"
 DOWNLOAD_URL_TTL = "60"
 SESSION_TTL = "28800"
-APP_TITLE = "Transfer"
 MAX_BATCH_FILES = "20"
