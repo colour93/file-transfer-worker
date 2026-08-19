@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { Check, ChevronLeft, ChevronRight, Copy, FileCog, KeyRound, Link2, LogIn, LogOut, Plus, Shield, Trash2 } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, Copy, FileCog, KeyRound, Link2, LogIn, LogOut, Plus, FolderOpen, Trash2 } from "lucide-react"
 
 import { formatBytes, request, type ManagedFile, type PageInfo, type UploadGrant } from "@/app/api"
 import { ColorSchemeButton } from "@/app/color-scheme"
@@ -24,6 +24,10 @@ type GrantForm = { label: string; timeRuleEnabled: boolean; validFrom: string; v
 function dateTimeInput(date: Date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
   return local.toISOString().slice(0, 16)
+}
+
+function dateTimeIso(value: string) {
+  return new Date(value).toISOString()
 }
 
 function freshForm(): GrantForm {
@@ -90,7 +94,7 @@ export function AdminPage() {
   if (authenticated === null) return <main className="mx-auto flex min-h-svh w-full max-w-6xl flex-col gap-4 px-6 py-8"><Skeleton className="h-8 w-32" /><Skeleton className="h-72 w-full" /></main>
 
   if (!authenticated) {
-    return <main className="grid min-h-svh place-items-center px-6"><Card className="w-full max-w-sm"><CardHeader><Shield /><CardTitle>{title} 管理</CardTitle></CardHeader><CardContent /><CardFooter><Button asChild className="w-full"><a href="/auth/login"><LogIn data-icon="inline-start" />登录</a></Button></CardFooter></Card></main>
+    return <main className="grid min-h-svh place-items-center px-6"><Card className="w-full max-w-sm"><CardHeader><FolderOpen /><CardTitle>{title} 管理</CardTitle></CardHeader><CardContent /><CardFooter><Button asChild className="w-full"><a href="/auth/login"><LogIn data-icon="inline-start" />登录</a></Button></CardFooter></Card></main>
   }
 
   async function create(event: FormEvent) {
@@ -99,7 +103,7 @@ export function AdminPage() {
     if (!form.timeRuleEnabled && !form.usesRuleEnabled) return setError("至少选择一条授权规则")
     try {
       const maxBatchBytes = Number(form.maxBatchSize) * unitBytes[form.sizeUnit]
-      const data = await request<{ code: string }>("/api/admin/upload-grants", { method: "POST", body: JSON.stringify({ label: form.label, timeRuleEnabled: form.timeRuleEnabled, validFrom: form.validFrom, validUntil: form.validUntil, usesRuleEnabled: form.usesRuleEnabled, maxUses: Number(form.maxUses), maxBatchBytes }) })
+      const data = await request<{ code: string }>("/api/admin/upload-grants", { method: "POST", body: JSON.stringify({ label: form.label, timeRuleEnabled: form.timeRuleEnabled, validFrom: form.timeRuleEnabled ? dateTimeIso(form.validFrom) : undefined, validUntil: form.timeRuleEnabled ? dateTimeIso(form.validUntil) : undefined, usesRuleEnabled: form.usesRuleEnabled, maxUses: Number(form.maxUses), maxBatchBytes }) })
       setCreated(data.code)
       setForm(freshForm())
       await load()
@@ -131,7 +135,7 @@ export function AdminPage() {
 
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-6xl flex-col gap-6 px-4 py-5 sm:gap-8 sm:px-6 sm:py-8">
-      <header className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-2 text-sm font-medium"><Shield className="shrink-0" /><span className="truncate">{title} 管理</span></div><div className="flex shrink-0 items-center gap-1"><ColorSchemeButton /><Button variant="ghost" size="sm" onClick={() => request("/auth/logout", { method: "POST" }).then(() => location.reload())}><LogOut data-icon="inline-start" /><span className="hidden min-[380px]:inline">退出</span></Button></div></header>
+      <header className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-2 text-sm font-medium"><FolderOpen className="shrink-0" /><span className="truncate">{title} 管理</span></div><div className="flex shrink-0 items-center gap-1"><ColorSchemeButton /><Button variant="ghost" size="sm" onClick={() => request("/auth/logout", { method: "POST" }).then(() => location.reload())}><LogOut data-icon="inline-start" /><span className="hidden min-[380px]:inline">退出</span></Button></div></header>
 
       <AnimatePresence>{created ? <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><Alert><AlertTitle>上传授权 PIN</AlertTitle><AlertDescription className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><code className="font-mono text-lg tracking-[0.2em]">{created}</code><div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => copy(buildCodeMessage(location.origin, "upload", created), "created-code")}>{copied === "created-code" ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}{copied === "created-code" ? "已复制" : "复制代码"}</Button><Button variant="outline" size="sm" onClick={() => copy(buildPrefilledUrl(location.origin, "upload", created), "created-url")}>{copied === "created-url" ? <Check data-icon="inline-start" /> : <Link2 data-icon="inline-start" />}{copied === "created-url" ? "已复制" : "复制直达链接"}</Button></div></AlertDescription></Alert></motion.div> : null}</AnimatePresence>
 

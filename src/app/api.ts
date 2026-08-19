@@ -40,7 +40,7 @@ export interface ManagedFile {
 export interface TransferManifest {
   id: string
   expiresAt: number
-  files: Array<{ id: string; name: string; type: string; size: number; url: string }>
+  files: Array<{ id: string; name: string; type: string; size: number; url: string; previewUrl: string }>
 }
 
 export interface PageInfo {

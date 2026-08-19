@@ -232,7 +232,14 @@ app.post('/api/batches/:id/complete', async (c) => {
 
 async function manifest(env: Env, batch: BatchRow) {
   const result = await env.DB.prepare('SELECT f.id,f.original_name,f.content_type,f.size_bytes,o.object_key FROM batch_files f JOIN stored_objects o ON o.id=f.object_id WHERE f.batch_id=? AND f.revoked_at IS NULL AND o.status=? ORDER BY f.ordinal').bind(batch.id, 'ready').all<any>()
-  const files = await Promise.all(result.results.map(async (file) => ({ id: file.id, name: file.original_name, type: file.content_type, size: file.size_bytes, url: await presignGet(env, file.object_key, file.original_name, Number(env.DOWNLOAD_URL_TTL || 60)) })))
+  const files = await Promise.all(result.results.map(async (file) => {
+    const ttl = Number(env.DOWNLOAD_URL_TTL || 60)
+    const [url, previewUrl] = await Promise.all([
+      presignGet(env, file.object_key, file.original_name, ttl),
+      presignGet(env, file.object_key, file.original_name, ttl, 'inline'),
+    ])
+    return { id: file.id, name: file.original_name, type: file.content_type, size: file.size_bytes, url, previewUrl }
+  }))
   return { id: batch.id, expiresAt: batch.expires_at, files }
 }
 
