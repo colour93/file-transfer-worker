@@ -839,6 +839,51 @@ export function AdminPage() {
                       <span className="text-muted-foreground">
                         {file.grant_label || "未命名授权"}
                       </span>
+                      <div className="mt-1 flex items-center gap-1">
+                        <code>{file.pickup_pin || "-"}</code>
+                        {file.pickup_pin ? (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            title="复制取件码"
+                            aria-label="复制取件码"
+                            onClick={() =>
+                              copy(
+                                buildCodeMessage(
+                                  location.origin,
+                                  "download",
+                                  file.pickup_pin!,
+                                  title,
+                                ),
+                                `file-${file.id}-code`,
+                              )
+                            }
+                          >
+                            {copied === `file-${file.id}-code` ? (
+                              <Check />
+                            ) : (
+                              <Copy />
+                            )}
+                          </Button>
+                        ) : null}
+                        {file.share_url ? (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            title="复制分享链接"
+                            aria-label="复制分享链接"
+                            onClick={() =>
+                              copy(file.share_url!, `file-${file.id}-url`)
+                            }
+                          >
+                            {copied === `file-${file.id}-url` ? (
+                              <Check />
+                            ) : (
+                              <Link2 />
+                            )}
+                          </Button>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell>{formatBytes(file.size_bytes)}</TableCell>
                     <TableCell>{file.active_references}</TableCell>
@@ -912,6 +957,50 @@ export function AdminPage() {
                     · {file.grant_label || "未命名授权"}
                   </span>
                 </div>
+                {file.pickup_pin ? (
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-muted-foreground">取件码</span>
+                    <code className="font-mono tracking-[0.12em]">
+                      {file.pickup_pin}
+                    </code>
+                  </div>
+                ) : null}
+                {file.pickup_pin || file.share_url ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!file.pickup_pin}
+                      onClick={() =>
+                        file.pickup_pin &&
+                        copy(
+                          buildCodeMessage(
+                            location.origin,
+                            "download",
+                            file.pickup_pin,
+                            title,
+                          ),
+                          `file-${file.id}-code`,
+                        )
+                      }
+                    >
+                      {copied === `file-${file.id}-code` ? <Check /> : <Copy />}
+                      复制取件码
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!file.share_url}
+                      onClick={() =>
+                        file.share_url &&
+                        copy(file.share_url, `file-${file.id}-url`)
+                      }
+                    >
+                      {copied === `file-${file.id}-url` ? <Check /> : <Link2 />}
+                      复制链接
+                    </Button>
+                  </div>
+                ) : null}
                 {file.batch_status === "ready" ? (
                   <div className="grid grid-cols-2 gap-2">
                     {!file.revoked_at ? (

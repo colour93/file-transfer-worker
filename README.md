@@ -8,7 +8,7 @@ Cloudflare Worker + D1 temporary batch transfer service. File bodies move direct
 2. Create D1 and replace `database_id` in `wrangler.toml`.
 3. Initialize D1 with `bunx wrangler d1 execute file-transfer --remote --file schema.sql`.
 4. Copy `.dev.vars.example` to `.dev.vars` and set local secrets. For production, store secrets with `bunx wrangler secret put`.
-5. Configure the S3 bucket CORS policy to allow `PUT` and `HEAD` from the application origin, including `content-type`, `content-md5`, and `x-amz-meta-md5`.
+5. Configure the S3 bucket CORS policy to allow `PUT` and `HEAD` from the application origin, including `content-type`, `content-md5`, and `x-amz-meta-md5`, and expose the `ETag` response header for multipart uploads.
 6. Register the configured `/auth/callback` URL with the OIDC provider.
 
 OIDC discovery is authoritative for the exact issuer value. Administrator email addresses must be verified by default; set `OIDC_REQUIRE_VERIFIED_EMAIL="false"` only when the provider cannot emit a verified email claim and the configured email allowlist is trusted.
@@ -35,3 +35,5 @@ Set `APP_TITLE` to customize the public and administration title. `MAX_BATCH_FIL
 Deploy with `bun run deploy`.
 
 The public API never receives file bodies. One upload authorization creates one batch with one pickup PIN. Browser-side size + MD5 checks reuse matching physical objects, while D1 keeps independent references for every active batch. Revoking or expiring a batch invalidates its pickup credentials immediately; the daily Cron removes uploads that are still pending after 12 hours and deletes an S3 object only after no active batch references it.
+
+Uploads larger than 32 MiB use S3 multipart upload through Uppy with 8 MiB or larger parts, automatic retries, and pause/resume support. Configure an S3 lifecycle rule to abort incomplete multipart uploads after one day so uploads abandoned by a closed browser do not retain parts indefinitely.

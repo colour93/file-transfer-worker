@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { request, type TransferManifest } from "@/app/api"
 import { md5File } from "@/app/hash"
@@ -8,6 +8,7 @@ import type {
   TransferStep,
   UploadResult,
 } from "@/app/public-transfer/types"
+import { createBatchUploader } from "@/app/uppy-upload"
 
 export function useTransferFlow() {
   const [step, setStep] = useState<TransferStep>("home")
@@ -17,11 +18,16 @@ export function useTransferFlow() {
   const [files, setFiles] = useState<File[]>([])
   const [pending, setPending] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [uploadSpeed, setUploadSpeed] = useState(0)
+  const [paused, setPaused] = useState(false)
   const [status, setStatus] = useState("")
   const [error, setError] = useState("")
   const [result, setResult] = useState<UploadResult | null>(null)
   const [manifest, setManifest] = useState<TransferManifest | null>(null)
   const [copied, setCopied] = useState<"code" | "share" | null>(null)
+  const uploaderRef = useRef<ReturnType<typeof createBatchUploader> | null>(
+    null,
+  )
   const totalSize = useMemo(
     () => files.reduce((sum, file) => sum + file.size, 0),
     [files],
@@ -94,6 +100,8 @@ export function useTransferFlow() {
     setPending(true)
     setError("")
     setProgress(0)
+    setUploadSpeed(0)
+    setPaused(false)
     try {
       const fingerprints: Array<{
         name: string
@@ -101,11 +109,17 @@ export function useTransferFlow() {
         type: string
         md5: string
       }> = []
+      let checkedBytes = 0
       for (let index = 0; index < files.length; index += 1) {
         setStatus(`正在检查 ${files[index].name}`)
         const md5 = await md5File(files[index], (value) =>
-          setProgress(((index + value) / files.length) * 35),
+          setProgress(
+            ((checkedBytes + files[index].size * value) /
+              Math.max(1, totalSize)) *
+              100,
+          ),
         )
+        checkedBytes += files[index].size
         fingerprints.push({
           name: files[index].name,
           size: files[index].size,
@@ -118,20 +132,25 @@ export function useTransferFlow() {
         method: "POST",
         body: JSON.stringify({ code: pin, files: fingerprints }),
       })
-      let uploaded = 0
-      for (const item of batch.uploads) {
-        setStatus(`正在上传 ${files[item.ordinal].name}`)
-        const response = await fetch(item.uploadUrl, {
-          method: "PUT",
-          headers: item.headers,
-          body: files[item.ordinal],
+      if (batch.uploads.length) {
+        setProgress(0)
+        const uploader = createBatchUploader({
+          batch,
+          files,
+          onProgress: ({ progress: value, speed, fileName }) => {
+            setProgress(value)
+            setUploadSpeed(speed)
+            setStatus(`正在上传 ${fileName}`)
+          },
         })
-        if (!response.ok)
-          throw new Error(`上传 ${files[item.ordinal].name} 失败`)
-        uploaded += 1
-        setProgress(35 + (uploaded / Math.max(1, batch.uploads.length)) * 60)
+        uploaderRef.current = uploader
+        const uploadResult = await uploader.upload()
+        if (uploadResult?.failed?.length)
+          throw new Error(`上传 ${uploadResult.failed[0].name} 失败`)
       }
       if (!batch.complete) {
+        setProgress(100)
+        setUploadSpeed(0)
         setStatus("正在完成批次")
         await request(`/api/batches/${batch.id}/complete`, {
           method: "POST",
@@ -145,9 +164,21 @@ export function useTransferFlow() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "上传失败")
     } finally {
+      uploaderRef.current?.destroy()
+      uploaderRef.current = null
       setPending(false)
+      setPaused(false)
+      setUploadSpeed(0)
       setStatus("")
     }
+  }
+
+  function togglePause() {
+    const uploader = uploaderRef.current
+    if (!uploader) return
+    if (paused) uploader.resumeAll()
+    else uploader.pauseAll()
+    setPaused(!paused)
   }
 
   async function copy(value: string, kind: "code" | "share") {
@@ -180,6 +211,8 @@ export function useTransferFlow() {
     setManifest(null)
     setError("")
     setProgress(0)
+    setUploadSpeed(0)
+    setPaused(false)
   }
 
   function back() {
@@ -215,10 +248,14 @@ export function useTransferFlow() {
       totalSize,
       pending,
       progress,
+      uploadSpeed,
+      paused,
+      canPause: Boolean(uploaderRef.current),
       status,
       error,
       onFilesChange: setFiles,
       onUpload: upload,
+      onTogglePause: togglePause,
     },
   }
 }

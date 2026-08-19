@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { motion } from "motion/react"
-import { Download, Eye, File, Files } from "lucide-react"
+import { Download, Eye, File } from "lucide-react"
 
 import { formatBytes, type TransferManifest } from "@/app/api"
 import { FilePreview, previewKind } from "@/app/public-transfer/file-preview"

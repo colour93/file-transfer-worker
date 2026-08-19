@@ -186,7 +186,9 @@ GET /api/admin/files?page=1&pageSize=20
       "expires_at": 1787673600,
       "grant_label": "项目资料",
       "object_status": "ready",
-      "active_references": 1
+      "active_references": 1,
+      "pickup_pin": "123456",
+      "share_url": "https://files.example/s/example-token"
     }
   ],
   "pagination": {
@@ -203,6 +205,7 @@ GET /api/admin/files?page=1&pageSize=20
 - `batch_status`：`pending`、`ready`、`revoked`、`expired`。
 - `object_status`：`pending`、`ready`、`deleted`。
 - `active_references`：当前仍被有效批次引用的数量。
+- `pickup_pin`、`share_url`：新批次的取件码和分享链接。升级前创建的历史批次未保存可恢复的凭据，因此这两个字段为 `null`。
 
 ### 撤销单个文件
 
@@ -225,3 +228,23 @@ POST /api/admin/batches/:id/revoke
 成功时返回 `{ "ok": true }`。批次不存在时返回 `404 { "error": "not_found" }`。
 
 只有 `pending` 或 `ready` 状态会被更新为 `revoked`；对其他状态重复调用仍返回成功。撤销尚未完成的 `pending` 批次时，会归还一次上传授权使用次数。批次关联的底层对象仅在没有其他有效引用时异步删除。
+
+## S3 分片上传
+
+以下接口由 Uppy 调用。它们不是管理员接口，但使用批次创建接口返回的 `completionToken` 鉴权。文件内容通过预签名 URL 直接上传到 S3，不经过 Worker。
+
+| 方法   | 路径                                                 | 用途                                              |
+| ------ | ---------------------------------------------------- | ------------------------------------------------- |
+| `POST` | `/api/batches/:id/files/:fileId/multipart/create`    | 创建 multipart upload，返回 `uploadId` 和 `key`。 |
+| `POST` | `/api/batches/:id/files/:fileId/multipart/parts`     | 查询已经上传的分片，用于继续上传。                |
+| `POST` | `/api/batches/:id/files/:fileId/multipart/sign-part` | 为指定 `partNumber` 签发 PUT URL。                |
+| `POST` | `/api/batches/:id/files/:fileId/multipart/complete`  | 提交 `PartNumber`/`ETag` 列表并合并对象。         |
+| `POST` | `/api/batches/:id/files/:fileId/multipart/abort`     | 中止 multipart upload 并清理分片。                |
+
+所有请求体都包含：
+
+```json
+{ "completionToken": "批次创建接口返回的 token" }
+```
+
+其余字段按操作增加：`uploadId`、`partNumber` 或 `parts`。签名接口限制分片编号为 1 至 10000。批次或对象不再处于 `pending` 状态时，接口不允许继续上传。

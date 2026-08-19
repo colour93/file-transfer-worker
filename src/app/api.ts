@@ -40,6 +40,8 @@ export interface ManagedFile {
   grant_label: string | null
   object_status: "pending" | "ready" | "deleted"
   active_references: number
+  pickup_pin: string | null
+  share_url: string | null
 }
 
 export interface TransferManifest {

@@ -1,4 +1,4 @@
-import { ArrowRight, Download, Upload } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 import { extractBracketedPin } from "@/app/sharing"
 import type { TransferMode } from "@/app/public-transfer/types"

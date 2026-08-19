@@ -4,11 +4,16 @@ import { createRemoteJWKSet, jwtVerify } from "jose"
 
 import { digest, pin, revealCode, safeEqual, sealCode, token } from "./crypto"
 import {
+  abortMultipartUpload,
+  completeMultipartUpload,
+  createMultipartUpload,
   deleteObject,
   headObject,
+  listMultipartParts,
   md5Base64,
   presignGet,
   presignPut,
+  presignUploadPart,
 } from "./s3"
 import type { Env } from "./types"
 
@@ -21,6 +26,19 @@ type ObjectRow = {
   size_bytes: number
   md5_hex: string
   status: string
+}
+type UploadFileRow = {
+  completion_hash: string
+  batch_status: string
+  object_key: string
+  object_status: string
+  content_type: string
+  md5_hex: string
+}
+type BatchCredentials = {
+  completionToken: string
+  pickupPin: string
+  shareToken: string
 }
 
 const app = new Hono<AppContext>()
@@ -38,6 +56,24 @@ const parseBody = async <T>(c: any) => {
   } catch {
     throw new Error("invalid_json")
   }
+}
+async function batchCredentials(value: string, secret: string) {
+  if (!value.startsWith("v1.")) return null
+  try {
+    return JSON.parse(await revealCode(value, secret)) as BatchCredentials
+  } catch {
+    return null
+  }
+}
+async function matchesCompletionToken(
+  stored: string,
+  value: string,
+  secret: string,
+) {
+  const credentials = await batchCredentials(stored, secret)
+  return credentials
+    ? safeEqual(credentials.completionToken, value)
+    : safeEqual(stored, await digest(value, secret))
 }
 const emails = (env: Env) =>
   new Set(
@@ -280,6 +316,10 @@ app.post("/api/batches", async (c) => {
   const pickupPin = pin()
   const shareToken = token(32)
   const completionToken = token(32)
+  const encryptedCredentials = await sealCode(
+    JSON.stringify({ completionToken, pickupPin, shareToken }),
+    c.env.HASH_SECRET,
+  )
   const reserved = await c.env.DB.batch([
     c.env.DB.prepare(
       "INSERT INTO transfer_batches(id,upload_grant_id,pickup_hash,share_hash,completion_hash,status,total_files,total_bytes,created_at) SELECT ?,id,?,?,?,'pending',?,?,? FROM upload_grants WHERE id=? AND revoked_at IS NULL AND (time_rule_enabled=0 OR (valid_from<=? AND valid_until>=?)) AND (uses_rule_enabled=0 OR used_uses<max_uses)",
@@ -287,7 +327,7 @@ app.post("/api/batches", async (c) => {
       batchId,
       await digest(pickupPin, c.env.HASH_SECRET),
       await digest(shareToken, c.env.HASH_SECRET),
-      await digest(completionToken, c.env.HASH_SECRET),
+      encryptedCredentials,
       files.length,
       totalBytes,
       timestamp,
@@ -440,10 +480,11 @@ app.post("/api/batches/:id/complete", async (c) => {
     .first()) as any
   if (
     !batch ||
-    !safeEqual(
+    !(await matchesCompletionToken(
       batch.completion_hash,
-      await digest(body.completionToken || "", c.env.HASH_SECRET),
-    )
+      body.completionToken || "",
+      c.env.HASH_SECRET,
+    ))
   )
     return jsonError("not_found", 404)
   if (batch.status === "ready")
@@ -528,6 +569,117 @@ app.post("/api/batches/:id/complete", async (c) => {
     .bind(completedAt, expiresAt, batch.id)
     .run()
   return c.json({ ok: true, expiresAt })
+})
+
+async function authorizedUploadFile(c: any, completionToken: string) {
+  const file = (await c.env.DB.prepare(
+    "SELECT b.completion_hash,b.status AS batch_status,o.object_key,o.status AS object_status,f.content_type,f.md5_hex FROM batch_files f JOIN transfer_batches b ON b.id=f.batch_id JOIN stored_objects o ON o.id=f.object_id WHERE f.id=? AND f.batch_id=? AND f.revoked_at IS NULL",
+  )
+    .bind(c.req.param("fileId"), c.req.param("id"))
+    .first()) as UploadFileRow | null
+  if (
+    !file ||
+    !(await matchesCompletionToken(
+      file.completion_hash,
+      completionToken || "",
+      c.env.HASH_SECRET,
+    ))
+  )
+    return null
+  if (file.batch_status !== "pending" || file.object_status !== "pending")
+    return null
+  return file
+}
+
+app.post("/api/batches/:id/files/:fileId/multipart/create", async (c) => {
+  const body = await parseBody<{ completionToken: string }>(c)
+  const file = await authorizedUploadFile(c, body.completionToken)
+  if (!file) return jsonError("not_found", 404)
+  return c.json(
+    await createMultipartUpload(
+      c.env,
+      file.object_key,
+      file.content_type,
+      file.md5_hex,
+    ),
+  )
+})
+
+app.post("/api/batches/:id/files/:fileId/multipart/parts", async (c) => {
+  const body = await parseBody<{
+    completionToken: string
+    uploadId: string
+  }>(c)
+  const file = await authorizedUploadFile(c, body.completionToken)
+  if (!file || !body.uploadId) return jsonError("not_found", 404)
+  return c.json(await listMultipartParts(c.env, file.object_key, body.uploadId))
+})
+
+app.post("/api/batches/:id/files/:fileId/multipart/sign-part", async (c) => {
+  const body = await parseBody<{
+    completionToken: string
+    uploadId: string
+    partNumber: number
+  }>(c)
+  const file = await authorizedUploadFile(c, body.completionToken)
+  const partNumber = Number(body.partNumber)
+  if (
+    !file ||
+    !body.uploadId ||
+    !Number.isSafeInteger(partNumber) ||
+    partNumber < 1 ||
+    partNumber > 10_000
+  )
+    return jsonError("invalid_part", 400)
+  const url = await presignUploadPart(
+    c.env,
+    file.object_key,
+    body.uploadId,
+    partNumber,
+    Number(c.env.UPLOAD_URL_TTL || 900),
+  )
+  return c.json({ url })
+})
+
+app.post("/api/batches/:id/files/:fileId/multipart/complete", async (c) => {
+  const body = await parseBody<{
+    completionToken: string
+    uploadId: string
+    parts: Array<{ PartNumber?: number; ETag?: string }>
+  }>(c)
+  const file = await authorizedUploadFile(c, body.completionToken)
+  const parts = Array.isArray(body.parts)
+    ? body.parts.map((part) => ({
+        PartNumber: Number(part.PartNumber),
+        ETag: String(part.ETag || ""),
+      }))
+    : []
+  if (
+    !file ||
+    !body.uploadId ||
+    !parts.length ||
+    parts.some(
+      (part) =>
+        !Number.isSafeInteger(part.PartNumber) ||
+        part.PartNumber < 1 ||
+        part.PartNumber > 10_000 ||
+        !part.ETag,
+    )
+  )
+    return jsonError("invalid_parts", 400)
+  await completeMultipartUpload(c.env, file.object_key, body.uploadId, parts)
+  return c.json({ location: file.object_key })
+})
+
+app.post("/api/batches/:id/files/:fileId/multipart/abort", async (c) => {
+  const body = await parseBody<{
+    completionToken: string
+    uploadId: string
+  }>(c)
+  const file = await authorizedUploadFile(c, body.completionToken)
+  if (!file || !body.uploadId) return jsonError("not_found", 404)
+  await abortMultipartUpload(c.env, file.object_key, body.uploadId)
+  return c.json({ ok: true })
 })
 
 async function manifest(env: Env, batch: BatchRow) {
@@ -706,11 +858,23 @@ app.get("/api/admin/files", requireAdmin, async (c) => {
   ).first<{ total: number }>()
   const pagination = pageResult(page, pageSize, Number(totalRow?.total || 0))
   const files = await c.env.DB.prepare(
-    "SELECT f.id,f.batch_id,f.original_name,f.content_type,f.size_bytes,f.md5_hex,f.revoked_at,b.status AS batch_status,b.created_at,b.expires_at,g.label AS grant_label,o.status AS object_status,(SELECT COUNT(*) FROM batch_files rf JOIN transfer_batches rb ON rb.id=rf.batch_id WHERE rf.object_id=o.id AND rf.revoked_at IS NULL AND rb.status='ready' AND rb.expires_at>?) AS active_references FROM batch_files f JOIN transfer_batches b ON b.id=f.batch_id JOIN upload_grants g ON g.id=b.upload_grant_id JOIN stored_objects o ON o.id=f.object_id ORDER BY b.created_at DESC,f.ordinal LIMIT ? OFFSET ?",
+    "SELECT f.id,f.batch_id,f.original_name,f.content_type,f.size_bytes,f.md5_hex,f.revoked_at,b.status AS batch_status,b.created_at,b.expires_at,b.completion_hash,g.label AS grant_label,o.status AS object_status,(SELECT COUNT(*) FROM batch_files rf JOIN transfer_batches rb ON rb.id=rf.batch_id WHERE rf.object_id=o.id AND rf.revoked_at IS NULL AND rb.status='ready' AND rb.expires_at>?) AS active_references FROM batch_files f JOIN transfer_batches b ON b.id=f.batch_id JOIN upload_grants g ON g.id=b.upload_grant_id JOIN stored_objects o ON o.id=f.object_id ORDER BY b.created_at DESC,f.ordinal LIMIT ? OFFSET ?",
   )
     .bind(now(), pageSize, (pagination.page - 1) * pageSize)
-    .all()
-  return c.json({ files: files.results, pagination })
+    .all<Record<string, unknown> & { completion_hash: string }>()
+  const results = await Promise.all(
+    files.results.map(async ({ completion_hash: encrypted, ...file }) => {
+      const credentials = await batchCredentials(encrypted, c.env.HASH_SECRET)
+      return {
+        ...file,
+        pickup_pin: credentials?.pickupPin || null,
+        share_url: credentials
+          ? `${new URL(c.req.url).origin}/s/${credentials.shareToken}`
+          : null,
+      }
+    }),
+  )
+  return c.json({ files: results, pagination })
 })
 
 async function reclaimObject(env: Env, objectId: string) {

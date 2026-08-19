@@ -1,4 +1,4 @@
-import { Check, Copy, Files, Upload } from "lucide-react"
+import { Check, Copy, Pause, Play, Upload } from "lucide-react"
 
 import { formatBytes } from "@/app/api"
 import { buildCodeMessage } from "@/app/sharing"
@@ -24,19 +24,27 @@ export function UploadStep({
   totalSize,
   pending,
   progress,
+  uploadSpeed,
+  paused,
+  canPause,
   status,
   error,
   onFilesChange,
   onUpload,
+  onTogglePause,
 }: {
   files: File[]
   totalSize: number
   pending: boolean
   progress: number
+  uploadSpeed: number
+  paused: boolean
+  canPause: boolean
   status: string
   error: string
   onFilesChange: (files: File[]) => void
   onUpload: () => void
+  onTogglePause: () => void
 }) {
   return (
     <div className="flex flex-col gap-8">
@@ -64,7 +72,22 @@ export function UploadStep({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
               <span className="truncate">{status || "正在处理"}</span>
-              <span>{Math.round(progress)}%</span>
+              <span className="flex shrink-0 items-center gap-2">
+                {uploadSpeed > 0 ? `${formatBytes(uploadSpeed)}/s` : null}
+                <span>{Math.round(progress)}%</span>
+                {canPause ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    title={paused ? "继续上传" : "暂停上传"}
+                    aria-label={paused ? "继续上传" : "暂停上传"}
+                    onClick={onTogglePause}
+                  >
+                    {paused ? <Play /> : <Pause />}
+                  </Button>
+                ) : null}
+              </span>
             </div>
             <Progress value={progress} />
           </div>
